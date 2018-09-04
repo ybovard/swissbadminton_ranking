@@ -3,11 +3,12 @@ MAINTAINER Yves Bovard <ybovard@gmail.com>
 
 # Select entrypoint
 WORKDIR /root/ranking
-CMD ["/usr/bin/python3.6", "ranking.py", "--url=$SWISSBADMINTON", "--players=$PLAYERLIST" ]
+CMD ["/usr/bin/python3.6", "ranking.py", "--config=config.ini", "--players=$PLAYERLIST" ]
 
 # Environment
 ENV TZ=Europe/Zurich
 
+COPY code/config.ini /root/ranking/config.ini
 COPY code/requirements.txt /root/ranking/requirements.txt
 COPY code/ranking.py /root/ranking/ranking.py
 
@@ -16,7 +17,7 @@ RUN echo "http://nl.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositorie
     && apk update && apk upgrade \
     && apk add tzdata \
     && cp /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
-    && apk add python3-dev \
+    && apk add build-base libffi-dev openssl-dev python3-dev \
     && cd /root/ranking \
     && pip3.6 install --upgrade pip \
     && pip3.6 install -r /root/ranking/requirements.txt
