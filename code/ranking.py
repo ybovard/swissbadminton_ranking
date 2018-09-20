@@ -4,6 +4,8 @@ import aiohttp
 import logging
 from bs4 import BeautifulSoup
 import argparse
+import os
+from aioslacker import Slacker
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 
@@ -37,7 +39,7 @@ class PLAYER_RANKING():
         return str
 
 
-async def outputStdout(loop,ranking):
+async def outputStdout(loop,ranking, key='ALL', param=None):
     for disc,chain in ranking.items():
         if disc == 'MS':
             logger.info("Men's single:")
@@ -83,6 +85,24 @@ async def outputStdout(loop,ranking):
                 p=p.nextSingle
         else:
             raise KeyError("discipline can be MS,WS,MD,WD,MM,MW but recieved {}".format(disc))
+    asyncio.wait(1)
+
+
+async def outputSlack(loop,ranking, key='ALL', param=None):
+    msg="# ranking UNDEF"
+    if key=='MS' or key=='WS':
+        p=ranking[key]
+        msg="# ranking {} {}, ".format(key,p.PLAYER.COLLECT)
+        while p is not None:
+            msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.SINGLE.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.SINGLE.POINT)
+            p=p.nextSingle
+
+    json_msg={"text": msg}
+    async with aiohttp.ClientSession() as session:
+        await session.post(param['url'], json=json_msg)
+
+
+async def outputXML(loop,ranking, key='ALL', param=None):
     asyncio.wait(1)
 
 
@@ -261,6 +281,8 @@ if __name__ == '__main__':
     config=configparser.ConfigParser()
     config.read(configFile)
 
+    slackParam={'url': os.environ.get('SLACK_WEBHOOK')}
+
     logging.basicConfig(format='%(asctime)-15s %(message)s',level=logging.INFO)
     logger=logging.getLogger()
 
@@ -287,10 +309,13 @@ if __name__ == '__main__':
 
     ranking=sortPlayerList(playerList)
 
+
     outputTasks=[]
-    outputTasks=[
-        asyncio.ensure_future(outputStdout(loop,ranking))
-    ]
+    outputTasks.append(asyncio.ensure_future(outputStdout(loop,ranking)))
+    outputTasks.append(asyncio.ensure_future(outputSlack(loop,ranking,'MS',slackParam)))
+    outputTasks.append(asyncio.ensure_future(outputSlack(loop,ranking,'WS',slackParam)))
+    outputTasks.append(asyncio.ensure_future(outputXML(loop,ranking)))
+
     tasks_done, _ =loop.run_until_complete(asyncio.wait(outputTasks))
 
     loop.close()
