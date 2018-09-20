@@ -5,12 +5,18 @@ import logging
 from bs4 import BeautifulSoup
 import argparse
 import os
+import sys
 from aioslacker import Slacker
+import datetime
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
+#https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
+URL_SWISSBADMINTON='https://www.swiss-badminton.ch/ranking'
+IDYEAR_SWISSBADMINTON=209
 
-class WRAPPER_PLAYER():
+class PLAYER_CHAIN():
     PLAYER=None
+    nextPlayer=None
     nextSingle=None
     nextDouble=None
     nextMixed=None
@@ -19,10 +25,10 @@ class RANK():
     POSITION=0
     POINT=0
 
-class PLAYER_RANKING():
+class PLAYER():
     ID=0
+    ERRORMSG=None
     LICENCE=0
-    COLLECT='01-1970'
     FULLNAME='Player Name'
     GENDER=''
     SINGLE=None
@@ -31,7 +37,7 @@ class PLAYER_RANKING():
 
 
     def __str__(self):
-        str="({}) {}[{}]:".format(self.COLLECT,self.FULLNAME,self.LICENCE)
+        str="{}[{}]:".format(self.FULLNAME,self.LICENCE)
         if self.GENDER=='M':
             str+=" MS: {}({}pts), HD: {}({}pts), MX: {}({}pts)".format(self.SINGLE.POSITION, self.SINGLE.POINT, self.DOUBLE.POSITION, self.DOUBLE.POINT, self.MX.POSITION, self.MX.POINT)
         elif self.GENDER=='W':
@@ -39,60 +45,70 @@ class PLAYER_RANKING():
         return str
 
 
-async def outputStdout(loop,ranking, key='ALL', param=None):
+async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
     for disc,chain in ranking.items():
         if disc == 'MS':
-            logger.info("Men's single:")
+            logger.info("Men's single {}".format(ranking['COLLECT']))
             logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
             p=chain
             while p is not None:
                 logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.SINGLE.POSITION,p.PLAYER.SINGLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
                 p=p.nextSingle
         elif disc == 'WS':
-            logger.info("Women's single:")
+            logger.info("Women's single {}".format(ranking['COLLECT']))
             logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
             p=chain
             while p is not None:
                 logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.SINGLE.POSITION,p.PLAYER.SINGLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
                 p=p.nextSingle
         elif disc == 'MD':
-            logger.info("Men's double:")
+            logger.info("Men's double {}".format(ranking['COLLECT']))
             logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
             p=chain
             while p is not None:
                 logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.DOUBLE.POSITION,p.PLAYER.DOUBLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextSingle
+                p=p.nextDouble
         elif disc == 'WD':
-            logger.info("Women's double:")
+            logger.info("Women's double {}".format(ranking['COLLECT']))
             logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
             p=chain
             while p is not None:
                 logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.DOUBLE.POSITION,p.PLAYER.DOUBLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextSingle
+                p=p.nextDouble
         elif disc == 'MM':
-            logger.info("Mixed double - Men:")
+            logger.info("Mixed double - Men {}".format(ranking['COLLECT']))
             logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
             p=chain
             while p is not None:
                 logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextSingle
+                p=p.nextMixed
         elif disc == 'MW':
-            logger.info("Mixed double - Women:")
+            logger.info("Mixed double - Women {}".format(ranking['COLLECT']))
             logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
             p=chain
             while p is not None:
                 logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextSingle
+                p=p.nextMixed
+        elif disc == 'ALL':
+            pass
+        elif disc == 'ERR':
+            logger.info("Problems with following players ({}):".format(ranking['COLLECT']))
+            p=chain
+            while p is not None:
+                logger.info("{} ({}): {}".format(p.PLAYER.FULLNAME,p.PLAYER.ID,p.PLAYER.ERRORMSG))
+                p=p.nextPlayer
+        elif disc == 'COLLECT':
+            pass
         else:
             raise KeyError("discipline can be MS,WS,MD,WD,MM,MW but recieved {}".format(disc))
     asyncio.wait(1)
 
 
-async def outputSlack(loop,ranking, key='ALL', param=None):
+async def outputSlack(loop,ranking, keyRanking='ALL', param=None):
     msg="# ranking UNDEF"
-    if key=='MS' or key=='WS':
-        p=ranking[key]
-        msg="# ranking {} {}, ".format(key,p.PLAYER.COLLECT)
+    if keyRanking=='MS' or keyRanking=='WS':
+        p=ranking[keyRanking]
+        msg="# ranking {} {}, ".format(keyRanking,ranking['COLLECT'])
         while p is not None:
             msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.SINGLE.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.SINGLE.POINT)
             p=p.nextSingle
@@ -102,7 +118,7 @@ async def outputSlack(loop,ranking, key='ALL', param=None):
         await session.post(param['url'], json=json_msg)
 
 
-async def outputXML(loop,ranking, key='ALL', param=None):
+async def outputXML(loop,ranking, keyRanking='ALL', param=None):
     asyncio.wait(1)
 
 
@@ -158,38 +174,56 @@ def updateRanking(playerWrap,chain,sortKey):
         raise KeyError("sortKey should be SINGLE,DOUBLE or MIXED but recieved {}".format(sortKey))
 
 
+def hasError(playerChain):
+    if playerChain.PLAYER.FULLNAME == '':
+        playerChain.PLAYER.ERRORMSG="no name found"
+        return True
+    if playerChain.PLAYER.GENDER == '':
+        playerChain.PLAYER.ERRORMSG="no gender found"
+        return True
+    return False
 
-def sortPlayerList(playerList):
-    ranking={}
-    ranking['MS']=None
-    ranking['WS']=None
-    ranking['MD']=None
-    ranking['WD']=None
-    ranking['MM']=None
-    ranking['MW']=None
-
-    for player in playerList:
-        wp=WRAPPER_PLAYER()
-        wp.PLAYER=player
-        if player.GENDER=='M':
-            ranking['MS']=updateRanking(wp,ranking['MS'],'SINGLE')
-            ranking['MD']=updateRanking(wp,ranking['MD'],'DOUBLE')
-            ranking['MM']=updateRanking(wp,ranking['MM'],'MIXED')
-        elif player.GENDER=='W':
-            ranking['WS']=updateRanking(wp,ranking['WS'],'SINGLE')
-            ranking['WD']=updateRanking(wp,ranking['WD'],'DOUBLE')
-            ranking['MW']=updateRanking(wp,ranking['MW'],'MIXED')
+def cleanPlayerList(playerChains):
+    p=playerChains['ALL']
+    pp=None
+    while p is not None:
+        if hasError(p):
+            tmp=p
+            # remove p from ALL chain
+            if pp is None:
+                playerChains['ALL']=tmp.nextPlayer
+            else:
+                pp.nextPlayer=tmp.nextPlayer
+            p=tmp.nextPlayer
+            
+            # add p to ERR chain
+            tmp.nextPlayer=playerChains['ERR']
+            playerChains['ERR']=tmp
         else:
-            raise KeyError("gender should be M or W but recieved {}".format(player.GENDER))
-    return ranking
+          pp=p
+          p=p.nextPlayer
 
 
-def parseHTMLPlayer(soupTable):
+def sortPlayerList(playerChains):
+    p=playerChains['ALL']
+    while p is not None:
+        if p.PLAYER.GENDER=='M':
+            playerChains['MS']=updateRanking(p,playerChains['MS'],'SINGLE')
+            playerChains['MD']=updateRanking(p,playerChains['MD'],'DOUBLE')
+            playerChains['MM']=updateRanking(p,playerChains['MM'],'MIXED')
+        elif p.PLAYER.GENDER=='W':
+            playerChains['WS']=updateRanking(p,playerChains['WS'],'SINGLE')
+            playerChains['WD']=updateRanking(p,playerChains['WD'],'DOUBLE')
+            playerChains['MW']=updateRanking(p,playerChains['MW'],'MIXED')
+        else:
+            raise KeyError("gender should be M or W but recieved '{}' for player {}({})".format(p.PLAYER.GENDER,p.PLAYER.ID, p.PLAYER.FULLNAME))
+        p=p.nextPlayer
+
+
+def parseHTMLPlayer(soupTable,playerInfo):
     caption=soupTable.find('caption').get_text().lstrip().rstrip()
     if caption[0:14] != "Rangliste von ":
-        return None
-
-    playerInfo=PLAYER_RANKING()
+        raise ValueError('no ranking information found for player {}'.format(player.ID))
 
     # extract name and licence number
     tmp=caption[14:-1].split('(')
@@ -231,10 +265,8 @@ def parseHTMLPlayer(soupTable):
                 playerInfo.MX.POSITION=int(tdList[1].text)
                 playerInfo.MX.POINT=tdList[4].get_text()
 
-    return playerInfo
 
-
-def parseHTML(html):
+def parseHTML(html,player):
     soup=BeautifulSoup(html,'html.parser')
     divContent = soup.find("div", {"id": "content"})
 
@@ -242,80 +274,108 @@ def parseHTML(html):
     rulerList=divContent.find_all(class_='ruler')
     for ruler in rulerList:
         if ruler.name=='table':
-            playerInfo=parseHTMLPlayer(ruler)
-            if playerInfo:
-                playerInfo.COLLECT=collectionDate
-                return playerInfo
-    
-    return None
+            parseHTMLPlayer(ruler,player)
+            return
+    raise ValueError('no information in HTML file found for player {}'.format(player.ID))
 
 
-async def getRanking(loop,url,playerid):
+async def getPlayerInfo(loop,url,player):
     html=None
     async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
         async with session.get(url) as response:
             html=await response.text()
-
-    if html is None:
-       playerInfo=PLAYER_RANKING()
-       playerInfo.ID=playerid
-       return (True,playerInfo)
+    if html is not None:
+        parseHTML(html, player)
     else:
-       playerInfo=parseHTML(html)
-       playerInfo.ID=playerid
-       return (playerInfo==None, playerInfo)
+        raise ValueError('no HTML file recieved for player {}'.format(player.ID))
        
+
+async def getWeekId(url):
+    html=None
+    opt=None
+    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+        async with session.get(url) as response:
+            html=await response.text()
+            soup=BeautifulSoup(html,'html.parser')
+            selectContent = soup.find("select", {"class": "publication"})
+            opt=selectContent.find("option", {"selected": "selected"})
+    if opt is None:
+        raise ValueError('cannot find information for year'.format(IDYEAR_SWISSBADMINTON))
+    weekid=opt.get('value')
+    weektxt=opt.get_text().lstrip().rstrip()
+    return (weekid,weektxt)
+
+
+async def controller(loop,playerChains,slackParam):
+    # first phase: get week id
+    weekId,weekTxt=await getWeekId('{}/ranking.aspx?rid={}'.format(URL_SWISSBADMINTON,IDYEAR_SWISSBADMINTON)) 
+    try:
+        int(weekId)
+    except ValueError as e:
+        raise ValueError("recieved weekid ({}) from swiss-badminton should be an int".format(weekId))
+##    cptWeekTxt=datetime.datetime.today().strftime("%U-%Y")
+##    if cptWeekTxt != weekTxt:
+##      raise ValueError("recieved week {} but should be {}".format(weekTxt,cptWeekTxt))
+
+    playerChains['COLLECT']=weekTxt
+
+
+    # second phase: look for player informations
+    tasks=[]
+    p=playerChains['ALL']
+    while p is not None:
+        url='{}/player.aspx?id={}&player={}'.format(URL_SWISSBADMINTON,weekId,p.PLAYER.ID)
+        tasks.append(getPlayerInfo(loop,url,p.PLAYER))
+        p=p.nextPlayer
+    completed,pending=await asyncio.wait(tasks)
+    cleanPlayerList(playerChains)
+
+    # third phase: sort result
+    p=playerChains['ERR']
+    while p is not None:
+        logger.warn("player id {}({}), error: {}".format(p.PLAYER.ID,p.PLAYER.FULLNAME,p.PLAYER.ERRORMSG))
+        p=p.nextPlayer
+    sortPlayerList(playerChains)
+
+    # forth phase: publish result
+    outputTasks=[]
+    outputTasks.append(outputStdout(loop,playerChains))
+    outputTasks.append(outputSlack(loop,playerChains,'MS',slackParam))
+    outputTasks.append(outputSlack(loop,playerChains,'WS',slackParam))
+    outputTasks.append(outputXML(loop,playerChains))
+    completed,pending=await asyncio.wait(outputTasks)
 
 
 if __name__ == '__main__':
-    parser=argparse.ArgumentParser()
-    parser.add_argument("--config",help="configuration file")
-    parser.add_argument("--playerid",help="list of Swissbadminton player ip numbers comma separated")
-    args=parser.parse_args()
-
-    if args.config is not None:
-      configFile=args.config
-    else:
-      configFile='ranking.ini'
-
-    config=configparser.ConfigParser()
-    config.read(configFile)
-
-    slackParam={'url': os.environ.get('SLACK_WEBHOOK')}
-
+    # setup logging
     logging.basicConfig(format='%(asctime)-15s %(message)s',level=logging.INFO)
     logger=logging.getLogger()
 
+    # parameter parsing
+    parser=argparse.ArgumentParser()
+    parser.add_argument("--playerid",help="list of Swissbadminton player ip numbers comma separated")
+    args=parser.parse_args()
+
+    slackParam={'url': os.environ.get('SLACK_WEBHOOK')}
+
+    # initialize data structure
+    playerChains={'COLLECT': None, 'ALL': None, 'MS': None, 'WS': None, 'MD': None, 'WD': None, 'MM': None, 'MW': None, 'ERR': None}
+    playerIdList=args.playerid.split(',')
+    for idPlayer in playerIdList:
+        try:
+            int(idPlayer)
+            player_node=PLAYER_CHAIN()
+            player_node.PLAYER=PLAYER()
+            player_node.PLAYER.ID=idPlayer
+            player_node.nextPlayer=playerChains['ALL']
+            playerChains['ALL']=player_node
+        except ValueError as e:
+            msg="player id must be a comma separated list of number. Recieved: '{}'".format(args.playerid)
+            logger.critical(msg)
+            raise TypeError(msg)
+
     loop=asyncio.get_event_loop()
-
-    tasks=[]
-    for player in config['PLAYER_LIST']:
-        url='{}&player={}'.format(config['WEBSITE']['url'],config['PLAYER_LIST'][player])
-        tasks.append(asyncio.ensure_future(getRanking(loop,url,config['PLAYER_LIST'][player])))
-
-    if args.playerid is not None:
-        for player in args.playerid.split(','):
-            url='{}&player={}'.format(config['WEBSITE']['url'],player)
-            tasks.append(asyncio.ensure_future(getRanking(loop,url,player)))
-
-    playerList=[]
-    tasks_done, _ =loop.run_until_complete(asyncio.wait(tasks))
-    for res in tasks_done:
-        err,obj=res.result()
-        if err:
-          logger.warn("problem when collecting information for player id {}".format(obj.ID))
-        else:
-          playerList.append(obj)
-
-    ranking=sortPlayerList(playerList)
-
-
-    outputTasks=[]
-    outputTasks.append(asyncio.ensure_future(outputStdout(loop,ranking)))
-    outputTasks.append(asyncio.ensure_future(outputSlack(loop,ranking,'MS',slackParam)))
-    outputTasks.append(asyncio.ensure_future(outputSlack(loop,ranking,'WS',slackParam)))
-    outputTasks.append(asyncio.ensure_future(outputXML(loop,ranking)))
-
-    tasks_done, _ =loop.run_until_complete(asyncio.wait(outputTasks))
-
-    loop.close()
+    try:
+        loop.run_until_complete(controller(loop,playerChains,slackParam))
+    finally:
+        loop.close()
