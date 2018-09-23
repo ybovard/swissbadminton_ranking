@@ -331,10 +331,6 @@ async def controller(loop,playerChains,slackParam):
     cleanPlayerList(playerChains)
 
     # third phase: sort result
-    p=playerChains['ERR']
-    while p is not None:
-        logger.warn("player id {}({}), error: {}".format(p.PLAYER.ID,p.PLAYER.FULLNAME,p.PLAYER.ERRORMSG))
-        p=p.nextPlayer
     sortPlayerList(playerChains)
 
     # forth phase: publish result
