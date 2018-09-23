@@ -3,12 +3,11 @@ MAINTAINER Yves Bovard <ybovard@gmail.com>
 
 # Select entrypoint
 WORKDIR /root/ranking
-CMD ["/usr/bin/python3.6", "ranking.py", "--config=config.ini", "--players=$PLAYERLIST" ]
+CMD ["/usr/bin/python3.6", " ranking.py", "--playerid=$PLAYER_ID_LIST"]
 
 # Environment
 ENV TZ=Europe/Zurich
 
-COPY code/config.ini /root/ranking/config.ini
 COPY code/requirements.txt /root/ranking/requirements.txt
 COPY code/ranking.py /root/ranking/ranking.py
 
