@@ -46,80 +46,129 @@ class PLAYER():
 
 
 async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
-    for disc,chain in ranking.items():
-        if disc == 'MS':
-            logger.info("Men's single {}".format(ranking['COLLECT']))
-            logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
-            p=chain
-            while p is not None:
-                logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.SINGLE.POSITION,p.PLAYER.SINGLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextSingle
-        elif disc == 'WS':
-            logger.info("Women's single {}".format(ranking['COLLECT']))
-            logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
-            p=chain
-            while p is not None:
-                logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.SINGLE.POSITION,p.PLAYER.SINGLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextSingle
-        elif disc == 'MD':
-            logger.info("Men's double {}".format(ranking['COLLECT']))
-            logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
-            p=chain
-            while p is not None:
-                logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.DOUBLE.POSITION,p.PLAYER.DOUBLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextDouble
-        elif disc == 'WD':
-            logger.info("Women's double {}".format(ranking['COLLECT']))
-            logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
-            p=chain
-            while p is not None:
-                logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.DOUBLE.POSITION,p.PLAYER.DOUBLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextDouble
-        elif disc == 'MM':
-            logger.info("Mixed double - Men {}".format(ranking['COLLECT']))
-            logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
-            p=chain
-            while p is not None:
-                logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextMixed
-        elif disc == 'MW':
-            logger.info("Mixed double - Women {}".format(ranking['COLLECT']))
-            logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
-            p=chain
-            while p is not None:
-                logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
-                p=p.nextMixed
-        elif disc == 'ALL':
-            pass
-        elif disc == 'ERR':
-            logger.info("Problems with following players ({}):".format(ranking['COLLECT']))
-            p=chain
-            while p is not None:
-                logger.info("{} ({}): {}".format(p.PLAYER.FULLNAME,p.PLAYER.ID,p.PLAYER.ERRORMSG))
-                p=p.nextPlayer
-        elif disc == 'COLLECT':
-            pass
-        else:
-            raise KeyError("discipline can be MS,WS,MD,WD,MM,MW but recieved {}".format(disc))
+    discList=[]
+    if keyRanking == 'ALL':
+      discList=['WS','MS','WD','MD','MM','MW']
+    else:
+      discList=[keyRanking]
+
+    if 'MS' in discList:
+      logger.info("Men's single {}".format(ranking['COLLECT']))
+      logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
+      p=ranking['MS']
+      while p is not None:
+        logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.SINGLE.POSITION,p.PLAYER.SINGLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
+        p=p.nextSingle
+
+    if 'WS' in discList:
+      logger.info("Women's single {}".format(ranking['COLLECT']))
+      logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
+      p=ranking['WS']
+      while p is not None:
+        logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.SINGLE.POSITION,p.PLAYER.SINGLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
+        p=p.nextSingle
+
+    if 'MD' in discList:
+      logger.info("Men's double {}".format(ranking['COLLECT']))
+      logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
+      p=ranking['MD']
+      while p is not None:
+        logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.DOUBLE.POSITION,p.PLAYER.DOUBLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
+        p=p.nextDouble
+
+    if 'WD' in discList:
+      logger.info("Women's double {}".format(ranking['COLLECT']))
+      logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
+      p=ranking['WD']
+      while p is not None:
+        logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.DOUBLE.POSITION,p.PLAYER.DOUBLE.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
+        p=p.nextDouble
+
+    if 'MM' in discList:
+      logger.info("Mixed double - Men {}".format(ranking['COLLECT']))
+      logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
+      p=ranking['MM']
+      while p is not None:
+        logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
+        p=p.nextMixed
+
+    if 'MW' in discList:
+      logger.info("Mixed double - Women {}".format(ranking['COLLECT']))
+      logger.info("{0:5s} {1:10s} {2}[{3}]".format('rank','points','name','licence'))
+      p=ranking['MW']
+      while p is not None:
+        logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
+        p=p.nextMixed
     asyncio.wait(1)
 
 
 async def outputSlack(loop,ranking, keyRanking='ALL', param=None):
-    msg="# ranking UNDEF"
-    if keyRanking=='MS' or keyRanking=='WS':
-        p=ranking[keyRanking]
-        msg="# ranking {} {}, ".format(keyRanking,ranking['COLLECT'])
+    discList=[]
+    if keyRanking == 'ALL':
+      discList=['WS','MS','WD','MD','MM','MW']
+    else:
+      discList=[keyRanking]
+
+    if 'MS' in discList:
+        p=ranking['MS']
+        msg="# men's single {}:".format(ranking['COLLECT'])
         while p is not None:
             msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.SINGLE.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.SINGLE.POINT)
             p=p.nextSingle
+        json_msg={"text": msg}
+        async with aiohttp.ClientSession() as session:
+          await session.post(param['url'], json=json_msg)
 
-    json_msg={"text": msg}
-    async with aiohttp.ClientSession() as session:
-        await session.post(param['url'], json=json_msg)
+    if 'WS' in discList:
+        p=ranking['WS']
+        msg="# women's single {}:".format(ranking['COLLECT'])
+        while p is not None:
+          msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.SINGLE.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.SINGLE.POINT)
+          p=p.nextSingle
+        json_msg={"text": msg}
+        async with aiohttp.ClientSession() as session:
+          await session.post(param['url'], json=json_msg)
 
+    if 'WD' in discList:
+        p=ranking['WD']
+        msg="# women's double {}:".format(ranking['COLLECT'])
+        while p is not None:
+          msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.DOUBLE.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.DOUBLE.POINT)
+          p=p.nextDouble
+        json_msg={"text": msg}
+        async with aiohttp.ClientSession() as session:
+          await session.post(param['url'], json=json_msg)
 
-async def outputXML(loop,ranking, keyRanking='ALL', param=None):
-    asyncio.wait(1)
+    if 'MD' in discList:
+        p=ranking['MD']
+        msg="# men's double {}:".format(ranking['COLLECT'])
+        while p is not None:
+          msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.DOUBLE.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.DOUBLE.POINT)
+          p=p.nextDouble
+        json_msg={"text": msg}
+        async with aiohttp.ClientSession() as session:
+          await session.post(param['url'], json=json_msg)
+
+    if 'MW' in discList:
+        p=ranking['MW']
+        msg="# mixed double women {}:".format(ranking['COLLECT'])
+        while p is not None:
+          msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.MX.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.DOUBLE.POINT)
+          p=p.nextMixed
+        json_msg={"text": msg}
+        async with aiohttp.ClientSession() as session:
+          await session.post(param['url'], json=json_msg)
+
+    if 'MM' in discList:
+        p=ranking['MM']
+        msg="# mixed double men {}:".format(ranking['COLLECT'])
+        while p is not None:
+          msg+="\n{0:5d}. {1}[{2}] ({3})".format(p.PLAYER.MX.POSITION, p.PLAYER.FULLNAME, p.PLAYER.LICENCE,p.PLAYER.DOUBLE.POINT)
+          p=p.nextMixed
+        json_msg={"text": msg}
+        async with aiohttp.ClientSession() as session:
+          await session.post(param['url'], json=json_msg)
+
 
 
 def updateRanking(playerWrap,chain,sortKey):
@@ -306,8 +355,8 @@ async def getWeekId(url):
     return (weekid,weektxt)
 
 
-async def controller(loop,playerChains,slackParam):
-    # first phase: get week id
+async def controller(loop,playerChains,outputList):
+    logger.info("get current week id")
     weekId,weekTxt=await getWeekId('{}/ranking.aspx?rid={}'.format(URL_SWISSBADMINTON,IDYEAR_SWISSBADMINTON)) 
     try:
         int(weekId)
@@ -316,11 +365,13 @@ async def controller(loop,playerChains,slackParam):
 ##    cptWeekTxt=datetime.datetime.today().strftime("%U-%Y")
 ##    if cptWeekTxt != weekTxt:
 ##      raise ValueError("recieved week {} but should be {}".format(weekTxt,cptWeekTxt))
+    logger.info("week {} ({}) found".format(weekTxt, weekId))
 
     playerChains['COLLECT']=weekTxt
 
 
     # second phase: look for player informations
+    logger.info("get player informations")
     tasks=[]
     p=playerChains['ALL']
     while p is not None:
@@ -330,16 +381,27 @@ async def controller(loop,playerChains,slackParam):
     completed,pending=await asyncio.wait(tasks)
     cleanPlayerList(playerChains)
 
+    if playerChains['ERR'] is not None:
+      logger.info("Problems with following players:")
+      p=playerChains['ERR']
+      while p is not None:
+        logger.info("{} ({}): {}".format(p.PLAYER.FULLNAME,p.PLAYER.ID,p.PLAYER.ERRORMSG))
+        p=p.nextPlayer
+
     # third phase: sort result
+    logger.info("sort results")
     sortPlayerList(playerChains)
 
     # forth phase: publish result
+    logger.info("publish to {}".format(outputList))
     outputTasks=[]
-    outputTasks.append(outputStdout(loop,playerChains))
-    outputTasks.append(outputSlack(loop,playerChains,'MS',slackParam))
-    outputTasks.append(outputSlack(loop,playerChains,'WS',slackParam))
-    outputTasks.append(outputXML(loop,playerChains))
-    completed,pending=await asyncio.wait(outputTasks)
+    if 'syslog' in outputList:
+      outputTasks.append(outputStdout(loop,playerChains))
+    if 'slack' in outputList:
+      slackParam={'url': os.environ.get('SLACK_WEBHOOK')}
+      outputTasks.append(outputSlack(loop,playerChains,'ALL',slackParam))
+    if len(outputTasks) > 0:
+      completed,pending=await asyncio.wait(outputTasks)
 
 
 if __name__ == '__main__':
@@ -350,9 +412,15 @@ if __name__ == '__main__':
     # parameter parsing
     parser=argparse.ArgumentParser()
     parser.add_argument("--playerid",help="list of Swissbadminton player ip numbers comma separated")
+    parser.add_argument("--slack", help="send ranking to slack. SLACK_WEBHOOK environment var has to be setted",action="store_true")
+    parser.add_argument("--syslog", help="send ranking to syslog",action="store_true")
     args=parser.parse_args()
 
-    slackParam={'url': os.environ.get('SLACK_WEBHOOK')}
+    outputList=[]
+    if args.slack:
+      outputList.append("slack")
+    if args.syslog:
+      outputList.append("syslog")
 
     # initialize data structure
     playerChains={'COLLECT': None, 'ALL': None, 'MS': None, 'WS': None, 'MD': None, 'WD': None, 'MM': None, 'MW': None, 'ERR': None}
@@ -372,6 +440,6 @@ if __name__ == '__main__':
 
     loop=asyncio.get_event_loop()
     try:
-        loop.run_until_complete(controller(loop,playerChains,slackParam))
+        loop.run_until_complete(controller(loop,playerChains,outputList))
     finally:
         loop.close()
