@@ -330,7 +330,7 @@ def parseHTML(html,player):
 
 async def getPlayerInfo(loop,url,player):
     html=None
-    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False)) as session:
         async with session.get(url) as response:
             html=await response.text()
     if html is not None:
@@ -342,7 +342,7 @@ async def getPlayerInfo(loop,url,player):
 async def getWeekId(url):
     html=None
     opt=None
-    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(verify_ssl=False)) as session:
+    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False)) as session:
         async with session.get(url) as response:
             html=await response.text()
             soup=BeautifulSoup(html,'html.parser')
