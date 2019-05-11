@@ -1,22 +1,21 @@
-FROM alpine:latest
-MAINTAINER Yves Bovard <ybovard@gmail.com>
+FROM python:alpine3.9
+MAINTAINER Yves Bovard <can.github@bovard.family>
 
 # Select entrypoint
 WORKDIR /root/ranking
-CMD ["/usr/bin/python3.6", " ranking.py", "--playerid=$PLAYER_ID_LIST"]
+
+# Install code
+COPY code/requirements.txt /root/ranking/requirements.txt
+COPY code/ranking.py /root/ranking/ranking.py
 
 # Environment
 ENV TZ=Europe/Zurich
 
-COPY code/requirements.txt /root/ranking/requirements.txt
-COPY code/ranking.py /root/ranking/ranking.py
-
 # Install dependencies and sources
-RUN echo "http://nl.alpinelinux.org/alpine/edge/testing" >> /etc/apk/repositories \
-    && apk update && apk upgrade \
-    && apk add tzdata \
-    && cp /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone \
-    && apk add build-base libffi-dev openssl-dev python3-dev \
+RUN apk update && apk upgrade \
     && cd /root/ranking \
-    && pip3.6 install --upgrade pip \
-    && pip3.6 install -r /root/ranking/requirements.txt
+    && pip3 install --upgrade pip \
+    && pip3 install -r /root/ranking/requirements.txt
+
+ENTRYPOINT ["/usr/local/bin/python3", "/root/ranking/ranking.py"]
+CMD ["--playerid=1234567"]
