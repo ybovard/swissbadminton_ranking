@@ -99,7 +99,6 @@ async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
       while p is not None:
         logger.info("{0:5d}. {1:10s} {2}[{3}] ".format(p.PLAYER.MX.POSITION,p.PLAYER.MX.POINT,p.PLAYER.FULLNAME,p.PLAYER.LICENCE))
         p=p.nextMixed
-    asyncio.wait(1)
 
 
 async def outputSlack(loop,ranking, keyRanking='ALL', param=None):
