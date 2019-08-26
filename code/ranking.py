@@ -11,8 +11,10 @@ import datetime
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
-URL_SWISSBADMINTON='https://www.swiss-badminton.ch/ranking'
-IDYEAR_SWISSBADMINTON=209
+URL_SWISSBADMINTON='https://www.swiss-badminton.ch'
+URL_SWISSBADMINTON_RANKING=URL_SWISSBADMINTON+'/ranking'
+IDYEAR_SWISSBADMINTON=21780
+RID=209
 
 class PLAYER_CHAIN():
     PLAYER=None
@@ -327,58 +329,84 @@ def parseHTML(html,player):
     raise ValueError('no information in HTML file found for player {}'.format(player.ID))
 
 
-async def getPlayerInfo(loop,url,player):
+async def getPlayerInfo(loop,url,player,session):
     html=None
-    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False)) as session:
-        async with session.get(url) as response:
-            html=await response.text()
+    async with session.get(url) as response:
+        html=await response.text()
     if html is not None:
         parseHTML(html, player)
     else:
         raise ValueError('no HTML file recieved for player {}'.format(player.ID))
        
 
-async def getWeekId(url):
+async def getWeekId(url,session):
     html=None
     opt=None
-    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False)) as session:
-        async with session.get(url) as response:
-            html=await response.text()
-            soup=BeautifulSoup(html,'html.parser')
-            selectContent = soup.find("select", {"class": "publication"})
-            opt=selectContent.find("option", {"selected": "selected"})
+    headers = {"Authorization": "Basic f'{cookie_value}'"}
+    async with session.get(url,headers=headers) as response:
+        html=await response.text()
+        soup=BeautifulSoup(html,'html.parser')
+        selectContent = soup.find("select", {"class": "publication"})
+        opt=selectContent.find("option", {"selected": "selected"})
     if opt is None:
-        raise ValueError('cannot find information for year'.format(IDYEAR_SWISSBADMINTON))
+      raise ValueError('cannot find information for year'.format(IDYEAR_SWISSBADMINTON))
     weekid=opt.get('value')
     weektxt=opt.get_text().lstrip().rstrip()
     return (weekid,weektxt)
 
 
+async def acceptCookies(httpSession):
+    #"btnAcceptCookies=Yes,%20I%20accept&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE=" 'https://www.swiss-badminton.ch/cookies/?returnurl=%2f'
+#    postArgs="btnAcceptCookies=Yes,%20I%20accept&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE="
+    postArgs={
+        "btnAcceptCookies": "Yes,%20I%20accept",
+        "__EVENTTARGET": None,
+        "__EVENTARGUMENT": None,
+        "__VIEWSTATE": None
+    }
+    async with httpSession.post('{}/cookies/?returnurl=%2f'.format(URL_SWISSBADMINTON),data=postArgs) as response:
+        if response.status != 200:
+            raise Exception('connection errors')
+    
+
+
+def printCookies(session):
+    cookies=session.cookie_jar.filter_cookies(URL_SWISSBADMINTON)
+    for var in cookies:
+      print("{}     =>      {}".format(var,cookies[var]))
+ 
 async def controller(loop,playerChains,outputList):
-    logger.info("get current week id")
-    weekId,weekTxt=await getWeekId('{}/ranking.aspx?rid={}'.format(URL_SWISSBADMINTON,IDYEAR_SWISSBADMINTON)) 
-    try:
-        int(weekId)
-    except ValueError as e:
-        raise ValueError("recieved weekid ({}) from swiss-badminton should be an int".format(weekId))
-##    cptWeekTxt=datetime.datetime.today().strftime("%U-%Y")
-##    if cptWeekTxt != weekTxt:
-##      raise ValueError("recieved week {} but should be {}".format(weekTxt,cptWeekTxt))
-    logger.info("week {} ({}) found".format(weekTxt, weekId))
-
-    playerChains['COLLECT']=weekTxt
+    #async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False),cookie_jar=aiohttp.CookieJar()) as session:
+    headers = {"Authorization": "Basic f'{cookie_value}'"}
+    async with aiohttp.ClientSession(loop=loop,cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
+        logger.info("accept cookies")
+        await acceptCookies(session)
 
 
-    # second phase: look for player informations
-    logger.info("get player informations")
-    tasks=[]
-    p=playerChains['ALL']
-    while p is not None:
-        url='{}/player.aspx?id={}&player={}'.format(URL_SWISSBADMINTON,weekId,p.PLAYER.ID)
-        tasks.append(getPlayerInfo(loop,url,p.PLAYER))
-        p=p.nextPlayer
-    completed,pending=await asyncio.wait(tasks)
-    cleanPlayerList(playerChains)
+        logger.info("get current week id")
+        weekId,weekTxt=await getWeekId('{}/category.aspx?rid={}&category=2792'.format(URL_SWISSBADMINTON_RANKING,RID),session) 
+
+        try:
+            int(weekId)
+        except ValueError as e:
+            raise ValueError("recieved weekid ({}) from swiss-badminton should be an int".format(weekId))
+##        cptWeekTxt=datetime.datetime.today().strftime("%U-%Y")
+##        if cptWeekTxt != weekTxt:
+##          raise ValueError("recieved week {} but should be {}".format(weekTxt,cptWeekTxt))
+        logger.info("week {} ({}) found".format(weekTxt, weekId))
+
+        playerChains['COLLECT']=weekTxt
+
+
+        logger.info("get player informations")
+        tasks=[]
+        p=playerChains['ALL']
+        while p is not None:
+            url='{}/player.aspx?id={}&player={}'.format(URL_SWISSBADMINTON_RANKING,weekId,p.PLAYER.ID)
+            tasks.append(getPlayerInfo(loop,url,p.PLAYER,session))
+            p=p.nextPlayer
+        completed,pending=await asyncio.wait(tasks)
+        cleanPlayerList(playerChains)
 
     if playerChains['ERR'] is not None:
       logger.info("Problems with following players:")
