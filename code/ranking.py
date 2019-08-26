@@ -13,7 +13,8 @@ import datetime
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
 URL_SWISSBADMINTON='https://www.swiss-badminton.ch'
 URL_SWISSBADMINTON_RANKING=URL_SWISSBADMINTON+'/ranking'
-IDYEAR_SWISSBADMINTON=209
+IDYEAR_SWISSBADMINTON=21780
+RID=209
 
 class PLAYER_CHAIN():
     PLAYER=None
@@ -341,7 +342,8 @@ async def getPlayerInfo(loop,url,player,session):
 async def getWeekId(url,session):
     html=None
     opt=None
-    async with session.get(url) as response:
+    headers = {"Authorization": "Basic f'{cookie_value}'"}
+    async with session.get(url,headers=headers) as response:
         html=await response.text()
         soup=BeautifulSoup(html,'html.parser')
         selectContent = soup.find("select", {"class": "publication"})
@@ -354,15 +356,35 @@ async def getWeekId(url,session):
 
 
 async def acceptCookies(httpSession):
-    pass
+    #"btnAcceptCookies=Yes,%20I%20accept&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE=" 'https://www.swiss-badminton.ch/cookies/?returnurl=%2f'
+#    postArgs="btnAcceptCookies=Yes,%20I%20accept&__EVENTTARGET=&__EVENTARGUMENT=&__VIEWSTATE="
+    postArgs={
+        "btnAcceptCookies": "Yes,%20I%20accept",
+        "__EVENTTARGET": None,
+        "__EVENTARGUMENT": None,
+        "__VIEWSTATE": None
+    }
+    async with httpSession.post('{}/cookies/?returnurl=%2f'.format(URL_SWISSBADMINTON),data=postArgs) as response:
+        if response.status != 200:
+            raise Exception('connection errors')
+    
 
+
+def printCookies(session):
+    cookies=session.cookie_jar.filter_cookies(URL_SWISSBADMINTON)
+    for var in cookies:
+      print("{}     =>      {}".format(var,cookies[var]))
+ 
 async def controller(loop,playerChains,outputList):
-    async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False)) as session:
+    #async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False),cookie_jar=aiohttp.CookieJar()) as session:
+    headers = {"Authorization": "Basic f'{cookie_value}'"}
+    async with aiohttp.ClientSession(loop=loop,cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
         logger.info("accept cookies")
         await acceptCookies(session)
 
+
         logger.info("get current week id")
-        weekId,weekTxt=await getWeekId('{}/ranking.aspx?rid={}'.format(URL_SWISSBADMINTON_RANKING,IDYEAR_SWISSBADMINTON),session) 
+        weekId,weekTxt=await getWeekId('{}/category.aspx?rid={}&category=2792'.format(URL_SWISSBADMINTON_RANKING,RID),session) 
 
         try:
             int(weekId)
