@@ -8,6 +8,10 @@ import os
 import sys
 from aioslacker import Slacker
 import datetime
+import json
+from aws_sig_v4_headers import aws_sig_v4_headers as awssig
+from pathlib import Path
+import urllib
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
@@ -170,6 +174,96 @@ async def outputSlack(loop,ranking, keyRanking='ALL', param=None):
         async with aiohttp.ClientSession() as session:
           await session.post(param['url'], json=json_msg)
 
+async def outputSQS(loop,ranking, param=None):
+    pre_headers = {'content-type': 'application/x-www-form-urlencoded'}
+    query = {}
+
+    aws_access_key=''
+    secret_access_key=''
+    with param['access'].open(mode='r') as ptr:
+      aws_access_key=ptr.read().replace('\n','')
+    with param['secret'].open(mode='r') as ptr:
+      aws_secret_access_key=ptr.read().replace('\n','')
+
+    p=ranking['ALL']
+    async with aiohttp.ClientSession(loop=loop) as session:
+        while p is not None:
+            player=p.PLAYER
+            postData={
+                "Action": "SendMessage",
+                "MessageBody": json.dumps({
+                    'name': player.FULLNAME,
+                    'licence': player.LICENCE,
+                    'gender': player.GENDER,
+                    'single': { 'point':  player.SINGLE.POINT, 'rank': player.SINGLE.POSITION },
+                    'double': { 'point':  player.DOUBLE.POINT, 'rank': player.DOUBLE.POSITION },
+                    'mx': { 'point':  player.MX.POINT, 'rank': player.MX.POSITION },
+                })
+            }
+            postDataStr="Action={}&MessageBody={}".format(postData['Action'],urllib.parse.quote_plus(postData['MessageBody'])).encode()
+            headers = awssig(aws_access_key, aws_secret_access_key, pre_headers,'sqs', param['region'], param['host'], 'POST', param['endpoint'].split(param['host'])[1], query, postDataStr)
+            res=await session.post(param['endpoint'], headers=headers, data=postDataStr)
+            if res.status != 200:
+                logging.warning("SQS request status {}: {}".format(res.status, await res.text()))
+            p=p.nextPlayer
+
+
+async def outputSQSBatch(loop,ranking, param=None):
+    #########################################################################
+    #https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue/
+    #?Action=SendMessageBatch
+    #&SendMessageBatchRequestEntry.1.Id=test_msg_001
+    #&SendMessageBatchRequestEntry.1.MessageBody=test%20message%20body%201
+    #&SendMessageBatchRequestEntry.2.Id=test_msg_002
+    #&SendMessageBatchRequestEntry.2.MessageBody=test%20message%20body%202
+    #&SendMessageBatchRequestEntry.2.DelaySeconds=60
+    #&SendMessageBatchRequestEntry.2.MessageAttribute.1.Name=test_attribute_name_1
+    #&SendMessageBatchRequestEntry.2.MessageAttribute.1.Value.StringValue=test_attribute_value_1
+    #&SendMessageBatchRequestEntry.2.MessageAttribute.1.Value.DataType=String
+    #&Expires=2020-05-05T22%3A52%3A43PST
+    #&Version=2012-11-05
+    #&AUTHPARAMS
+    #########################################################################
+
+    headers = {'content-type': 'application/x-www-form-urlencoded'}
+    postData={"Action": "SendMessageBatch"}
+
+    p=ranking['ALL']
+    id=1 #needed by SQS
+    while p is not None:
+        player=p.PLAYER
+        postData["SendMessageBatchRequestEntry.{}.Id".format(id)]=player.LICENCE
+        postData["SendMessageBatchRequestEntry.{}.MessageBody".format(id)]=json.dumps({'name': player.FULLNAME, 'licence': player.LICENCE, 'gender': player.GENDER})
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.1.Name".format(id)]="name"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.1.Value.StringValue".format(id)]=player.FULLNAME
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.1.Value.DataType".format(id)]="String"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.2.Name".format(id)]="gender"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.2.Value.StringValue".format(id)]=player.GENDER
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.2.Value.DataType".format(id)]="String"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.3.Name".format(id)]="singlept"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.3.Value.StringValue".format(id)]=player.SINGLE.POINT
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.3.Value.DataType".format(id)]="Number"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.4.Name".format(id)]="singlerk"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.4.Value.StringValue".format(id)]=player.SINGLE.POSITION
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.4.Value.DataType".format(id)]="Number"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.5.Name".format(id)]="doublept"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.5.Value.StringValue".format(id)]=player.DOUBLE.POINT
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.5.Value.DataType".format(id)]="Number"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.6.Name".format(id)]="doublerk"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.6.Value.StringValue".format(id)]=player.DOUBLE.POSITION
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.6.Value.DataType".format(id)]="Number"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.7.Name".format(id)]="mxpt"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.7.Value.StringValue".format(id)]=player.MX.POINT
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.7.Value.DataType".format(id)]="Number"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.8.Name".format(id)]="mxrk"
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.8.Value.StringValue".format(id)]=player.MX.POSITION
+        #postData["SendMessageBatchRequestEntry.{}.MessageAttribute.8.Value.DataType".format(id)]="Number"
+        id+=1
+        p=p.nextPlayer
+
+    print(postData)
+    async with aiohttp.ClientSession(loop=loop) as session:
+        await session.post(param['endpoint'], headers=headers, data=postData)
 
 
 def updateRanking(playerWrap,chain,sortKey):
@@ -422,11 +516,13 @@ async def controller(loop,playerChains,outputList):
     # forth phase: publish result
     logger.info("publish to {}".format(outputList))
     outputTasks=[]
-    if 'syslog' in outputList:
+    if 'syslog' in outputList.keys():
       outputTasks.append(outputStdout(loop,playerChains))
-    if 'slack' in outputList:
-      slackParam={'url': os.environ.get('SLACK_WEBHOOK')}
-      outputTasks.append(outputSlack(loop,playerChains,'ALL',slackParam))
+    if 'slack' in outputList.keys():
+      outputTasks.append(outputSlack(loop,playerChains,'ALL',outputList['slack']))
+    if 'sqs' in outputList.keys():
+      outputTasks.append(outputSQS(loop,playerChains,outputList['sqs']))
+
     if len(outputTasks) > 0:
       completed,pending=await asyncio.wait(outputTasks)
 
@@ -441,13 +537,26 @@ if __name__ == '__main__':
     parser.add_argument("--playerid",help="list of Swissbadminton player ip numbers comma separated")
     parser.add_argument("--slack", help="send ranking to slack. SLACK_WEBHOOK environment var has to be setted",action="store_true")
     parser.add_argument("--syslog", help="send ranking to syslog",action="store_true")
+    parser.add_argument("--sqs", help="send ranking to an SQS instance")
+    parser.add_argument("--aws-region", dest='awsRegion', help="AWS region")
+    parser.add_argument("--aws-host", dest='awsHost', help="AWS host")
+    parser.add_argument("--aws-access-key", dest='awsAccess', help="file containing the AWS access key", default="/tmp/.aws_access_key")
+    parser.add_argument("--aws-secret-access-key", dest='awsSecret', help="file containing the AWS secret access key", default="/tmp/.aws_secret_access_key")
     args=parser.parse_args()
 
-    outputList=[]
+    outputList={}
     if args.slack:
-      outputList.append("slack")
+      outputList["slack"]={'url': os.environ.get('SLACK_WEBHOOK')}
     if args.syslog:
-      outputList.append("syslog")
+      outputList["syslog"]={}
+    if args.sqs:
+      outputList["sqs"]={
+          'endpoint': args.sqs,
+          'access': Path(args.awsAccess).resolve(strict=True),
+          'secret': Path(args.awsSecret).resolve(strict=True),
+          'region': args.awsRegion,
+          'host': args.awsHost
+      }
 
     # initialize data structure
     playerChains={'COLLECT': None, 'ALL': None, 'MS': None, 'WS': None, 'MD': None, 'WD': None, 'MM': None, 'MW': None, 'ERR': None}
