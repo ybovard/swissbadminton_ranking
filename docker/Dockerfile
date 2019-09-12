@@ -12,11 +12,19 @@ COPY code/aws_sig_v4_headers.py /root/ranking/aws_sig_v4_headers.py
 # Environment
 ENV TZ=Europe/Zurich
 
-# Install dependencies and sources
+# Install OS dependencies
 RUN apk update && apk upgrade \
-    && cd /root/ranking \
-    && pip3 install --upgrade pip \
-    && pip3 install -r /root/ranking/requirements.txt
+    && apk add git \
+    && pip3 install --upgrade pip
+
+# Install aiosqs
+RUN cd /root \
+    && git clone https://gitlab.com/lagaffe/aiosqs.git \
+    && cd aiosqs \
+    && python setup.py install
+
+# Install pip dependencies
+RUN pip3 install -r /root/ranking/requirements.txt
 
 ENTRYPOINT ["/usr/local/bin/python3", "/root/ranking/ranking.py"]
 CMD ["--playerid=1234567"]

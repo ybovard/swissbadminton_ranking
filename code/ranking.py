@@ -9,9 +9,9 @@ import sys
 from aioslacker import Slacker
 import datetime
 import json
-from aws_sig_v4_headers import aws_sig_v4_headers as awssig
 from pathlib import Path
 import urllib
+import aiosqs
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
@@ -187,24 +187,18 @@ async def outputSQS(loop,ranking, param=None):
 
     p=ranking['ALL']
     async with aiohttp.ClientSession(loop=loop) as session:
+        sqsgw=aiosqs.SQS(aws_access_key, aws_secret_access_key, param['region'], param['host'],  param['endpoint'])
         while p is not None:
             player=p.PLAYER
-            postData={
-                "Action": "SendMessage",
-                "MessageBody": json.dumps({
-                    'name': player.FULLNAME,
-                    'licence': player.LICENCE,
-                    'gender': player.GENDER,
-                    'single': { 'point':  player.SINGLE.POINT, 'rank': player.SINGLE.POSITION },
-                    'double': { 'point':  player.DOUBLE.POINT, 'rank': player.DOUBLE.POSITION },
-                    'mx': { 'point':  player.MX.POINT, 'rank': player.MX.POSITION },
-                })
-            }
-            postDataStr="Action={}&MessageBody={}".format(postData['Action'],urllib.parse.quote_plus(postData['MessageBody'])).encode()
-            headers = awssig(aws_access_key, aws_secret_access_key, pre_headers,'sqs', param['region'], param['host'], 'POST', param['endpoint'].split(param['host'])[1], query, postDataStr)
-            res=await session.post(param['endpoint'], headers=headers, data=postDataStr)
-            if res.status != 200:
-                logging.warning("SQS request status {}: {}".format(res.status, await res.text()))
+            data=json.dumps({
+                'name': player.FULLNAME,
+                'licence': player.LICENCE,
+                'gender': player.GENDER,
+                'single': { 'point':  player.SINGLE.POINT, 'rank': player.SINGLE.POSITION },
+                'double': { 'point':  player.DOUBLE.POINT, 'rank': player.DOUBLE.POSITION },
+                'mx': { 'point':  player.MX.POINT, 'rank': player.MX.POSITION },
+            })
+            await sqsgw.put(data, session)
             p=p.nextPlayer
 
 
