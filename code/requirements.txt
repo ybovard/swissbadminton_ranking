@@ -8,3 +8,4 @@ idna-ssl
 multidict
 yarl
 aioslacker
+simple-crypt

@@ -15,6 +15,12 @@ when publishing the ranking on slack, the environment variable SLACK_WEBHOOK hav
 ## sqs
 the value of "--sqs" should be the full endpoint, for example: http://localhost:9324/queue/myqueue. If using Amazon SQS, then aws-region and aws-host must be setted as well. The credentials should be added to files. The path can be specified by --aws-access-key and --aws-secret-access-key. Only the corresponding value should be in these files. By default --aws-access-key is /tmp/.aws-access-key and --aws-secret-access-key is /tmp/.aws-secret-access-key
 
+## encryption
+On some output method, there is possible to encrypt data using the --encryption parameter. This parameter, if set, points to a file container the encryption key to use. If not setted, the data are sent unencrypted.
+
+Output method which allows encryption:
+* sqs
+
 # Docker
 ## build image
 ```

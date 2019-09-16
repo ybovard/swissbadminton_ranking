@@ -7,7 +7,6 @@ WORKDIR /root/ranking
 # Install code
 COPY code/requirements.txt /root/ranking/requirements.txt
 COPY code/ranking.py /root/ranking/ranking.py
-COPY code/aws_sig_v4_headers.py /root/ranking/aws_sig_v4_headers.py
 
 # Environment
 ENV TZ=Europe/Zurich
@@ -15,6 +14,7 @@ ENV TZ=Europe/Zurich
 # Install OS dependencies
 RUN apk update && apk upgrade \
     && apk add git \
+    && apk add gcc g++ make libffi-dev openssl-dev \
     && pip3 install --upgrade pip
 
 # Install aiosqs

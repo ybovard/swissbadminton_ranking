@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 import urllib
 import aiosqs
+from simplecrypt import encrypt, decrypt
+from base64 import b64encode
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
@@ -181,9 +183,13 @@ async def outputSQS(loop,ranking, param=None):
     aws_access_key=''
     secret_access_key=''
     with param['access'].open(mode='r') as ptr:
-      aws_access_key=ptr.read().replace('\n','')
+        aws_access_key=ptr.read().replace('\n','')
     with param['secret'].open(mode='r') as ptr:
-      aws_secret_access_key=ptr.read().replace('\n','')
+        aws_secret_access_key=ptr.read().replace('\n','')
+    passwd=None
+    if param['encryption']:
+        with param['encryption'].open(mode='r') as ptr:
+            passwd=ptr.read().replace('\n','')
 
     p=ranking['ALL']
     async with aiohttp.ClientSession(loop=loop) as session:
@@ -198,7 +204,10 @@ async def outputSQS(loop,ranking, param=None):
                 'double': { 'point':  player.DOUBLE.POINT, 'rank': player.DOUBLE.POSITION },
                 'mx': { 'point':  player.MX.POINT, 'rank': player.MX.POSITION },
             })
-            await sqsgw.put(data, session)
+            if passwd:
+                await sqsgw.put(b64encode(encrypt(passwd,data)), session)
+            else:
+                await sqsgw.put(data, session)
             p=p.nextPlayer
 
 
@@ -536,6 +545,7 @@ if __name__ == '__main__':
     parser.add_argument("--aws-host", dest='awsHost', help="AWS host")
     parser.add_argument("--aws-access-key", dest='awsAccess', help="file containing the AWS access key", default="/tmp/.aws_access_key")
     parser.add_argument("--aws-secret-access-key", dest='awsSecret', help="file containing the AWS secret access key", default="/tmp/.aws_secret_access_key")
+    parser.add_argument("--encryption", dest='encryptionFile', help="file containing the encryption key")
     args=parser.parse_args()
 
     outputList={}
@@ -551,6 +561,12 @@ if __name__ == '__main__':
           'region': args.awsRegion,
           'host': args.awsHost
       }
+    if args.encryptionFile:
+        encr=Path(args.encryptionFile).resolve(strict=True)
+    else:
+      encr=None
+    for out in outputList:
+      outputList[out]['encryption']=encr
 
     # initialize data structure
     playerChains={'COLLECT': None, 'ALL': None, 'MS': None, 'WS': None, 'MD': None, 'WD': None, 'MM': None, 'MW': None, 'ERR': None}
