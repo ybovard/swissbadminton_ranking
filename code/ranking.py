@@ -191,6 +191,11 @@ async def outputSQS(loop,ranking, param=None):
         with param['encryption'].open(mode='r') as ptr:
             passwd=ptr.read().replace('\n','')
 
+    mattr=None
+    if 'sqsmattr' in param:
+        mattrTab=param['sqsmattr'].split(':')
+        mattr=[{'name': mattrTab[0], 'type': mattrTab[1], 'value': mattrTab[2]}]
+
     p=ranking['ALL']
     async with aiohttp.ClientSession(loop=loop) as session:
         sqsgw=aiosqs.SQS(aws_access_key, aws_secret_access_key, param['region'], param['host'],  param['endpoint'])
@@ -207,7 +212,7 @@ async def outputSQS(loop,ranking, param=None):
             if passwd:
                 await sqsgw.put(b64encode(encrypt(passwd,data)), session)
             else:
-                await sqsgw.put(data, session)
+                await sqsgw.put(data, session, attrList=mattr)
             p=p.nextPlayer
 
 
@@ -541,6 +546,7 @@ if __name__ == '__main__':
     parser.add_argument("--slack", help="send ranking to slack. SLACK_WEBHOOK environment var has to be setted",action="store_true")
     parser.add_argument("--syslog", help="send ranking to syslog",action="store_true")
     parser.add_argument("--sqs", help="send ranking to an SQS instance")
+    parser.add_argument("--sqsmattr", help="message attribute. Format: <attrName>:<attrType>:<value>")
     parser.add_argument("--aws-region", dest='awsRegion', help="AWS region")
     parser.add_argument("--aws-host", dest='awsHost', help="AWS host")
     parser.add_argument("--aws-access-key", dest='awsAccess', help="file containing the AWS access key", default="/tmp/.aws_access_key")
