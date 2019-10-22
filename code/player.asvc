@@ -1,15 +1,16 @@
-{"namespace": "ranking.avro",
+{
+ "namespace": "ranking.avro",
  "type": "record",
  "name": "player",
  "fields": [
      {"name": "name", "type": "string"},
      {"name": "licence", "type": "string"},
      {"name": "woman", "type": "boolean"},
-     {"name": "singlePTS", "type": "float"},
-     {"name": "doublePTS", "type": "float"},
-     {"name": "mxPTS", "type": "float"},
-     {"name": "singlePOS", "type": "int"},
-     {"name": "doublePOS", "type": "int"},
-     {"name": "mxPOS", "type": "int"}
+     {"name": "singlepts", "type": "float"},
+     {"name": "doublepts", "type": "float"},
+     {"name": "mxpts", "type": "float"},
+     {"name": "singlepos", "type": "int"},
+     {"name": "doublepos", "type": "int"},
+     {"name": "mxpos", "type": "int"}
  ]
 }

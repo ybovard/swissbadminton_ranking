@@ -59,6 +59,31 @@ class PLAYER():
 
 
 
+class Serializer:
+    def serialize(self): raise NotImplementedError()
+
+
+
+class SerializerAvro(Serializer):
+    _schema=None
+
+    def __init__(self): self._schema=avro.schema.Parse(open("player.asvc", "rb").read())
+          
+    def serialize(self,data):
+        buf = io.BytesIO()
+        writer = avro.datafile.DataFileWriter(buf, avro.io.DatumWriter(), self._schema)
+        writer.append(json.dumps(data))
+        writer.flush()
+        buf.seek(0)
+        return buf.read()
+      
+
+
+class SerializerJson(Serializer):
+    def serialize(self,data): return json.dumps(data)
+
+
+
 async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
     discList=[]
     if keyRanking == 'ALL':
@@ -183,24 +208,6 @@ async def outputSlack(loop,ranking, keyRanking='ALL', param=None):
           await session.post(param['url'], json=json_msg)
 
 
-class SerializerAvro:
-    _schema=None
-
-    def __init__(self): self._schema=avro.schema.parse(open("player.asvc", "rb").read())
-          
-    def serialize(self,data):
-        buf = io.BytesIO()
-        writer = avro.datafile.DataFileWriter(buf, avro.io.DatumWriter(), self._schema)
-        writer.append(data)
-        writer.flush()
-        buf.seek(0)
-        return buf.read()
-      
-
-class SerializerJson:
-    def serialize(self,data): return json.dumps(data)
-
-
 async def outputSQS(loop,ranking, param=None):
     pre_headers = {'content-type': 'application/x-www-form-urlencoded'}
     query = {}
@@ -222,7 +229,7 @@ async def outputSQS(loop,ranking, param=None):
         mattr=[{'name': mattrTab[0], 'type': mattrTab[1], 'value': mattrTab[2]}]
 
     p=ranking['ALL']
-    async with aiohttp.ClientSession(loop=loop) as session:
+    async with aiohttp.ClientSession() as session:
         sqsgw=aiosqs.SQS(aws_access_key, aws_secret_access_key, param['region'], param['host'],  param['endpoint'])
         while p is not None:
             player=p.PLAYER
@@ -508,7 +515,8 @@ def printCookies(session):
 async def controller(loop,playerChains,outputList):
     #async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False),cookie_jar=aiohttp.CookieJar()) as session:
     headers = {"Authorization": "Basic f'{cookie_value}'"}
-    async with aiohttp.ClientSession(loop=loop,cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
+    #async with aiohttp.ClientSession(loop=loop,cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
+    async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
         logger.info("accept cookies")
         await acceptCookies(session)
 
@@ -574,7 +582,7 @@ if __name__ == '__main__':
     parser.add_argument("--slack", help="send ranking to slack. SLACK_WEBHOOK environment var has to be setted",action="store_true")
     parser.add_argument("--syslog", help="send ranking to syslog",action="store_true")
     parser.add_argument("--sqs", help="send ranking to an SQS instance")
-    parser.add_argument("--sqsavro", help="serialize data in AVRO before sending to SQS queues",type=bool, default=True)
+    parser.add_argument("--sqs-avro", dest="sqsavro", help="serialize data in AVRO before sending to SQS queues", action='store_true')
     parser.add_argument("--sqsmattr", help="message attribute. Format: <attrName>:<attrType>:<value>")
     parser.add_argument("--aws-region", dest='awsRegion', help="AWS region")
     parser.add_argument("--aws-host", dest='awsHost', help="AWS host")
@@ -596,6 +604,11 @@ if __name__ == '__main__':
           'region': args.awsRegion,
           'host': args.awsHost
       }
+      if args.sqsavro:
+          outputList["sqs"]["serializer"]=SerializerAvro()
+      else:
+          outputList["sqs"]["serializer"]=SerializerJson()
+
     if args.encryptionFile:
         encr=Path(args.encryptionFile).resolve(strict=True)
     else:
