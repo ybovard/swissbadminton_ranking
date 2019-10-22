@@ -4,6 +4,7 @@ import aiohttp
 import logging
 from bs4 import BeautifulSoup
 import argparse
+import io
 import os
 import sys
 from aioslacker import Slacker
@@ -14,6 +15,9 @@ import urllib
 import aiosqs
 from simplecrypt import encrypt, decrypt
 from base64 import b64encode
+import avro.schema
+import avro.datafile
+import avro.io
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
@@ -21,6 +25,7 @@ URL_SWISSBADMINTON='https://www.swiss-badminton.ch'
 URL_SWISSBADMINTON_RANKING=URL_SWISSBADMINTON+'/ranking'
 IDYEAR_SWISSBADMINTON=21780
 RID=209
+SCHEMA=None
 
 class PLAYER_CHAIN():
     PLAYER=None
@@ -51,6 +56,7 @@ class PLAYER():
         elif self.GENDER=='W':
             str+=" WS: {}({}pts), WD: {}({}pts), MX: {}({}pts)".format(self.SINGLE.POSITION, self.SINGLE.POINT, self.DOUBLE.POSITION, self.DOUBLE.POINT, self.MX.POSITION, self.MX.POINT)
         return str
+
 
 
 async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
@@ -176,6 +182,25 @@ async def outputSlack(loop,ranking, keyRanking='ALL', param=None):
         async with aiohttp.ClientSession() as session:
           await session.post(param['url'], json=json_msg)
 
+
+class SerializerAvro:
+    _schema=None
+
+    def __init__(self): self._schema=avro.schema.parse(open("player.asvc", "rb").read())
+          
+    def serialize(self,data):
+        buf = io.BytesIO()
+        writer = avro.datafile.DataFileWriter(buf, avro.io.DatumWriter(), self._schema)
+        writer.append(data)
+        writer.flush()
+        buf.seek(0)
+        return buf.read()
+      
+
+class SerializerJson:
+    def serialize(self,data): return json.dumps(data)
+
+
 async def outputSQS(loop,ranking, param=None):
     pre_headers = {'content-type': 'application/x-www-form-urlencoded'}
     query = {}
@@ -201,13 +226,16 @@ async def outputSQS(loop,ranking, param=None):
         sqsgw=aiosqs.SQS(aws_access_key, aws_secret_access_key, param['region'], param['host'],  param['endpoint'])
         while p is not None:
             player=p.PLAYER
-            data=json.dumps({
+            data=param['serializer'].serialize({
                 'name': player.FULLNAME,
                 'licence': player.LICENCE,
-                'gender': player.GENDER,
-                'single': { 'point':  player.SINGLE.POINT, 'rank': player.SINGLE.POSITION },
-                'double': { 'point':  player.DOUBLE.POINT, 'rank': player.DOUBLE.POSITION },
-                'mx': { 'point':  player.MX.POINT, 'rank': player.MX.POSITION },
+                'woman': player.GENDER=='W',
+                'singlepts': player.SINGLE.POINT,
+                'singlepos': player.SINGLE.POSITION,
+                'doublepts': player.DOUBLE.POINT,
+                'doublepos': player.DOUBLE.POSITION,
+                'mxpts': player.MX.POINT,
+                'mxpos': player.MX.POSITION
             })
             if passwd:
                 await sqsgw.put(b64encode(encrypt(passwd,data)), session)
@@ -546,6 +574,7 @@ if __name__ == '__main__':
     parser.add_argument("--slack", help="send ranking to slack. SLACK_WEBHOOK environment var has to be setted",action="store_true")
     parser.add_argument("--syslog", help="send ranking to syslog",action="store_true")
     parser.add_argument("--sqs", help="send ranking to an SQS instance")
+    parser.add_argument("--sqsavro", help="serialize data in AVRO before sending to SQS queues",type=bool, default=True)
     parser.add_argument("--sqsmattr", help="message attribute. Format: <attrName>:<attrType>:<value>")
     parser.add_argument("--aws-region", dest='awsRegion', help="AWS region")
     parser.add_argument("--aws-host", dest='awsHost', help="AWS host")

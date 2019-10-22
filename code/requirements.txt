@@ -9,3 +9,4 @@ multidict
 yarl
 aioslacker
 simple-crypt
+avro-python3
