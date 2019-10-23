@@ -213,9 +213,9 @@ async def outputSQS(loop,ranking, param=None):
                 'name': player.FULLNAME,
                 'licence': player.LICENCE,
                 'gender': player.GENDER,
-                'single': { 'point':  int(player.SINGLE.POINT), 'rank': float(player.SINGLE.POSITION) },
-                'double': { 'point':  int(player.DOUBLE.POINT), 'rank': float(player.DOUBLE.POSITION) },
-                'mx': { 'point':  int(player.MX.POINT), 'rank': float(player.MX.POSITION) }
+                'single': { 'point':  float(player.SINGLE.POINT), 'rank': int(player.SINGLE.POSITION) },
+                'double': { 'point':  float(player.DOUBLE.POINT), 'rank': int(player.DOUBLE.POSITION) },
+                'mx': { 'point':  float(player.MX.POINT), 'rank': int(player.MX.POSITION) }
             })
             if passwd:
                 await sqsgw.put(b64encode(encrypt(passwd,data)), session)
