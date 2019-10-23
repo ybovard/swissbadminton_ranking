@@ -1,0 +1,16 @@
+syntax = "proto2";
+
+package swissbadminton_ranking;
+
+message Player {
+  required string name = 1;
+  required string licence = 2;
+  required bool woman = 3;
+  repeated Result results = 4;
+
+  message Result {
+    required string sport = 1;
+    required int32 position = 2;
+    required float points = 3;
+  }
+}

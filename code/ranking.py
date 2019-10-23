@@ -14,6 +14,7 @@ import urllib
 import aiosqs
 from simplecrypt import encrypt, decrypt
 from base64 import b64encode
+import player_pb2
 
 #https://www.swiss-badminton.ch/ranking/player.aspx?id=18623&player=2836215
 #https://www.swiss-badminton.ch/ranking/ranking.aspx?rid=209
@@ -59,6 +60,27 @@ class Serializer:
 
 class SerializerJson(Serializer):
     def serialize(self,data): return json.dumps(data)
+
+
+class SerializerProtobuf(Serializer):
+    def serialize(self,data): 
+        player=player_pb2.Player()
+        player.name=data["name"]
+        player.licence=data["licence"]
+        player.woman=data["gender"] == 'W'
+        single=player.results.add()
+        single.sport='single'
+        single.points=data["single"]["point"]
+        single.position=data["single"]["rank"]
+        double=player.results.add()
+        double.sport='double'
+        double.points=data["double"]["point"]
+        double.position=data["double"]["rank"]
+        mx=player.results.add()
+        mx.sport='mx'
+        mx.points=data["mx"]["point"]
+        mx.position=data["mx"]["rank"]
+        return b64encode(player.SerializeToString())
 
 
 async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
@@ -205,7 +227,7 @@ async def outputSQS(loop,ranking, param=None):
         mattr=[{'name': mattrTab[0], 'type': mattrTab[1], 'value': mattrTab[2]}]
 
     p=ranking['ALL']
-    async with aiohttp.ClientSession(loop=loop) as session:
+    async with aiohttp.ClientSession() as session:
         sqsgw=aiosqs.SQS(aws_access_key, aws_secret_access_key, param['region'], param['host'],  param['endpoint'])
         while p is not None:
             player=p.PLAYER
@@ -488,7 +510,7 @@ def printCookies(session):
 async def controller(loop,playerChains,outputList):
     #async with aiohttp.ClientSession(loop=loop,connector=aiohttp.TCPConnector(ssl=False),cookie_jar=aiohttp.CookieJar()) as session:
     headers = {"Authorization": "Basic f'{cookie_value}'"}
-    async with aiohttp.ClientSession(loop=loop,cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
+    async with aiohttp.ClientSession(cookie_jar=aiohttp.CookieJar(),headers=headers) as session:
         logger.info("accept cookies")
         await acceptCookies(session)
 
@@ -555,6 +577,7 @@ if __name__ == '__main__':
     parser.add_argument("--syslog", help="send ranking to syslog",action="store_true")
     parser.add_argument("--sqs", help="send ranking to an SQS instance")
     parser.add_argument("--sqsmattr", help="message attribute. Format: <attrName>:<attrType>:<value>")
+    parser.add_argument("--sqspb", help="serialize value using protobuf", action="store_true")
     parser.add_argument("--aws-region", dest='awsRegion', help="AWS region")
     parser.add_argument("--aws-host", dest='awsHost', help="AWS host")
     parser.add_argument("--aws-access-key", dest='awsAccess', help="file containing the AWS access key", default="/tmp/.aws_access_key")
@@ -573,9 +596,13 @@ if __name__ == '__main__':
           'access': Path(args.awsAccess).resolve(strict=True),
           'secret': Path(args.awsSecret).resolve(strict=True),
           'region': args.awsRegion,
-          'host': args.awsHost,
-          'serializer': SerializerJson()
+          'host': args.awsHost
       }
+      if args.sqspb:
+        outputList["sqs"]["serializer"]=SerializerProtobuf()
+      else:
+        outputList["sqs"]["serializer"]=SerializerJson()
+    
     if args.encryptionFile:
         encr=Path(args.encryptionFile).resolve(strict=True)
     else:

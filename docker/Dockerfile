@@ -7,6 +7,7 @@ WORKDIR /root/ranking
 # Install code
 COPY code/requirements.txt /root/ranking/requirements.txt
 COPY code/ranking.py /root/ranking/ranking.py
+COPY code/player_pb2.py /root/ranking/player_pb2.py
 
 # Environment
 ENV TZ=Europe/Zurich
