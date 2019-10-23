@@ -53,6 +53,14 @@ class PLAYER():
         return str
 
 
+class Serializer:
+    def serialize(self): raise NotImplementedError()
+
+
+class SerializerJson(Serializer):
+    def serialize(self,data): return json.dumps(data)
+
+
 async def outputStdout(loop,ranking, keyRanking='ALL', param=None):
     discList=[]
     if keyRanking == 'ALL':
@@ -201,7 +209,7 @@ async def outputSQS(loop,ranking, param=None):
         sqsgw=aiosqs.SQS(aws_access_key, aws_secret_access_key, param['region'], param['host'],  param['endpoint'])
         while p is not None:
             player=p.PLAYER
-            data=json.dumps({
+            data=param['serializer'].serialize({
                 'name': player.FULLNAME,
                 'licence': player.LICENCE,
                 'gender': player.GENDER,
@@ -565,7 +573,8 @@ if __name__ == '__main__':
           'access': Path(args.awsAccess).resolve(strict=True),
           'secret': Path(args.awsSecret).resolve(strict=True),
           'region': args.awsRegion,
-          'host': args.awsHost
+          'host': args.awsHost,
+          'serializer': SerializerJson()
       }
     if args.encryptionFile:
         encr=Path(args.encryptionFile).resolve(strict=True)
