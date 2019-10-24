@@ -223,8 +223,7 @@ async def outputSQS(loop,ranking, param=None):
 
     mattr=None
     if 'sqsmattr' in param:
-        mattrTab=param['sqsmattr'].split(':')
-        mattr=[{'name': mattrTab[0], 'type': mattrTab[1], 'value': mattrTab[2]}]
+        mattr=param['sqsmattr']
 
     p=ranking['ALL']
     async with aiohttp.ClientSession() as session:
@@ -598,6 +597,13 @@ if __name__ == '__main__':
           'region': args.awsRegion,
           'host': args.awsHost
       }
+      if args.sqsmattr:
+        attrList=args.sqsmattr.split(',')
+        if len(attrList) > 0: outputList["sqs"]["sqsmattr"]=[]
+        for attr in attrList:
+          attrParamList=attr.split(':')
+          outputList["sqs"]["sqsmattr"].append({'name': attrParamList[0], 'type': attrParamList[1], 'value': attrParamList[2]})
+
       if args.sqspb:
         outputList["sqs"]["serializer"]=SerializerProtobuf()
       else:
